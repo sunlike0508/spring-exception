@@ -63,4 +63,131 @@ WAS(sendError 호출 기록 확인) <- 필터 <- 서블릿 <- 인터셉터 <- �
 
 그리고 호출 되었다면 설정한 오류 코드에 맞추어 기본 오류 페이지를 보여준다.
 
+## 서블릿 예외 처리 - 오류 페이지 작동 원리
+
+예를 들어서 `RuntimeException` 예외가 WAS까지 전달되면, WAS는 오류 페이지 정보를 확인한다.
+
+확인해보니 `RuntimeException` 의 오류 페이지로 `/error-page/500` 이 지정되어 있다.
+
+WAS는 오류 페이지를 출력하기 위해 `/error-page/500` 를 다시 요청한다.
+
+**오류 페이지 요청 흐름**
+
+```
+WAS `/error-page/500` 다시 요청 -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러(/error-page/500) -> View
+```
+
+**예외 발생과 오류 페이지 요청 흐름**
+
+```
+1.WAS(여기까지 전파) <- 필터 <- 서블릿 <- 인터셉터 <- 컨트롤러(예외발생)
+
+2.WAS `/error-page/500` 다시 요청 -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러(/error-page/
+500) -> View
+```
+
+**중요한 점은 웹 브라우저(클라이언트)는 서버 내부에서 이런 일이 일어나는지 전혀 모른다는 점이다. 오직 서버 내부에 서 오류 페이지를 찾기 위해 추가적인 호출을 한다.**
+
+정리하면 다음과 같다.
+
+1. 예외가 발생해서 WAS까지 전파된다.
+
+2. WAS는 오류 페이지 경로를 찾아서 내부에서 오류 페이지를 호출한다. 이때 오류 페이지 경로로 필터, 서블릿, 인터셉터, 컨트롤러가 모두 다시 호출된다.
+
+즉, 오류가 발생하면 클라이언트는 1번 호출했으나 실제로는 2번 호출한 효과를 나타냄
+
+### 오류 정보
+
+**request.attribute에 서버가 담아준 정보**
+
+`javax.servlet.error.exception` : 예외
+
+`javax.servlet.error.exception_type` : 예외 타입
+
+`javax.servlet.error.message` : 오류 메시지
+
+`javax.servlet.error.request_uri` : 클라이언트 요청 URI
+
+`javax.servlet.error.servlet_name` : 오류가 발생한 서블릿 이름
+
+`javax.servlet.error.status_code` : HTTP 상태 코드
+
+## 서블릿 예외 처리 - 필터
+
+오류가 발생하면 오류 페이지를 호출하기 위해 WAS 내부에서 다시 한번 호출한다.
+
+인터셉터 또한 다시 호출된다. 이건 정말 비효율적이다. 오류 페이지 호출한다고 다시 호출하다니...
+
+결국 클라이언트로 부터 발생한 정상 요청인지, 아니면 오류 페이지를 출력하기 위한 내부 요청인지 구분을 위해 `DispatcherType` 이라는 추가 정보를 제공한다.
+
+## DispatcherType
+
+`log.info("dispatchType={}", request.getDispatcherType())`
+
+출력해보면 오류 페이지에서 `dispatchType=ERROR` 로 나오는 것을 확인할 수 있다.
+
+고객이 처음 요청하면 `dispatcherType=REQUEST` 이다.
+
+이렇듯 서블릿 스펙은 실제 고객이 요청한 것인지, 서버가 내부에서 오류 페이지를 요청하는 것인지
+`DispatcherType` 으로 구분할 수 있는 방법을 제공한다.
+
+`javax.servlet.DispatcherType`
+
+```
+ public enum DispatcherType {
+     FORWARD,
+     INCLUDE,
+     REQUEST,
+     ASYNC,
+     ERROR
+}
+```
+
+**DispatcherType**
+
+`REQUEST` : 클라이언트 요청
+
+`ERROR` : 오류 요청
+
+`FORWARD` : MVC에서 배웠던 서블릿에서 다른 서블릿이나 JSP를 호출할 때 `RequestDispatcher.forward(request, response);`
+
+`INCLUDE` : 서블릿에서 다른 서블릿이나 JSP의 결과를 포함할 때 `RequestDispatcher.include(request, response);`
+
+`ASYNC` : 서블릿 비동기 호출
+
+```java
+
+@Bean
+public FilterRegistrationBean logFilter() {
+    FilterRegistrationBean<Filter> filterRegistrationBean = new FilterRegistrationBean<>();
+    filterRegistrationBean.setFilter(new LogFilter());
+    filterRegistrationBean.setOrder(1);
+    filterRegistrationBean.addUrlPatterns("/*");
+    filterRegistrationBean.setDispatcherTypes(DispatcherType.REQUEST, DispatcherType.ERROR);
+    return filterRegistrationBean;
+}
+```
+
+`filterRegistrationBean.setDispatcherTypes(DispatcherType.REQUEST, DispatcherType.ERROR);`
+
+이렇게 두 가지를 모두 넣으면 클라이언트 요청은 물론이고, 오류 페이지 요청에서도 필터가 호출된다.
+
+아무것도 넣지 않으면 기본 값이 `DispatcherType.REQUEST` 이다. 즉 클라이언트의 요청이 있는 경우에만 필터가 적용된다.
+
+특별히 오류 페이지 경로도 필터를 적용할 것이 아니면, 기본 값을 그대로 사용하면 된다.
+
+물론 오류 페이지 요청 전용 필터를 적용하고 싶으면 `DispatcherType.ERROR` 만 지정하면 된다.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
