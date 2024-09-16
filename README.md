@@ -178,14 +178,41 @@ public FilterRegistrationBean logFilter() {
 
 물론 오류 페이지 요청 전용 필터를 적용하고 싶으면 `DispatcherType.ERROR` 만 지정하면 된다.
 
+## 서블릿 예외 처리 - 인터셉터
 
+인터셉터는 다음과 같이 요청 경로에 따라서 추가하거나 제외하기 쉽게 되어 있기 때문에, 이러한 설정을 사용해 서 오류 페이지 경로를 `excludePathPatterns` 를 사용해서 빼주면 된다.
 
+```java
 
+@Override
+public void addInterceptors(InterceptorRegistry registry) {
+    registry.addInterceptor(new LogInterceptor()).order(1).addPathPatterns("/**")
+            .excludePathPatterns("/css/**", "/*.ico", "/error", "/error-page/**"); //오류 페이지 경로
+}
+```
 
+여기에서 `/error-page/**` 를 제거하면 `error-page/500` 같은 내부 호출의 경우에도 인터셉터가 호출된다.
 
+**전체 흐름 정리**
 
+`/hello` 정상 요청
 
+```
+WAS(/hello, dispatchType=REQUEST) -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러 -> View 
+```
 
+`/error-ex` 오류 요청
+
+필터는 `DispatchType` 으로 중복 호출 제거 ( `dispatchType=REQUEST` )
+
+인터셉터는 경로 정보로 중복 호출 제거( `excludePathPatterns("/error-page/**")` )
+
+1. WAS(/error-ex, dispatchType=REQUEST) -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러
+2. WAS(여기까지 전파) <- 필터 <- 서블릿 <- 인터셉터 <- 컨트롤러(예외발생)
+3. WAS 오류 페이지 확인
+4. WAS(/error-page/500, dispatchType=ERROR) -> 필터(x) -> 서블릿 -> 인터셉터(x) -> 컨트롤러(/error-page/500) -> View
+           
+ 
 
 
 
