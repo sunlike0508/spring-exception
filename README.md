@@ -414,11 +414,137 @@ public void extendHandlerExceptionResolvers(List<HandlerExceptionResolver> resol
 2) `configureHandlerExceptionResolvers(..)` 를 사용하면 스프링이 기본으로 등록하는 `ExceptionResolver` 가 제거되므로 주의,
    `extendHandlerExceptionResolvers` 를 사용하자.
 
+## 스프링 부트가 기본으로 제공하는 `ExceptionResolver`
+
+스프링 부트가 기본으로 제공하는 `ExceptionResolver` 는 다음과 같다.
+
+`HandlerExceptionResolverComposite` 에 다음 순서로 등록
+
+1. `ExceptionHandlerExceptionResolver`
+2. `ResponseStatusExceptionResolver`
+3. `DefaultHandlerExceptionResolver` 우선순위가가장낮다.
+
+**ExceptionHandlerExceptionResolver**
+
+@ExceptionHandler 을 이용하여 처리. 실질적으로 이게 제일 많이 쓰임
+
+**ResponseStatusExceptionResolver**
+
+Http 상태 코드를 지정해준다.
+
+ex) `@ResponseStatus(value = HttpStatus.NOT_FOUND)`
+
+**DefaultHandlerExceptionResolver**
+
+스프링 내부 기본 예외를 처리한다.
+
+### ResponseStatusExceptionResolver
+
+ResponseStatusExceptionResolver 예외에 따라서 HTTP 상태 코드를 지정해주는 역할을 한다.
+
+1) `@ResponseStatus` 가 달려있는 예외
+
+```java
+
+@ResponseStatus(code = HttpStatus.BAD_REQUEST, reason = "잘못된 요청 오류")
+public class BadRequestException extends RuntimeException {}
+```
+
+`BadRequestException` 예외가 컨트롤러 밖으로 넘어가면 `ResponseStatusExceptionResolver` 예외가 해 당 애노테이션을 확인해서 오류 코드를
+
+`HttpStatus.BAD_REQUEST` (400)으로 변경하고, 메시지도 담는다.
+
+```java
+//ResponseStatusExceptionResolver 클래스 안의 메소드
 
 
+private ModelAndView doResolveException(HttpServletRequest request, HttpServletResponse response,
+        @Nullable Object handler, Exception ex) {
+    ResponseStatus status = AnnotatedElementUtils.findMergedAnnotation(ex.getClass(), ResponseStatus.class);
+
+    if(status != null) {
+        return resolveResponseStatus(status, request, response, handler, ex);
+        //resolveResponseStatus 안에서 아래 applyStatusAndReason를 호출
+    }
+
+    return null;
+}
 
 
+private ModelAndView applyStatusAndReason(int statusCode, @Nullable String reason, HttpServletResponse response)
+        throws IOException {
 
+    if(!StringUtils.hasLength(reason)) {
+        response.sendError(statusCode);
+    } else {
+        String resolvedReason = (this.messageSource != null ?
+                this.messageSource.getMessage(reason, null, reason, LocaleContextHolder.getLocale()) :
+                reason);
+        response.sendError(statusCode, resolvedReason);
+    }
+    return new ModelAndView();
+}
+```
+
+`ResponseStatusExceptionResolver` 코드를 확인해보면 결국 `response.sendError(statusCode, resolvedReason)` 를 호출하는 것을 확인할 수 있다.
+`sendError(400)` 를 호출했기 때문에 WAS에서 다시 오류 페이지( `/error` )를 내부 요청한다.
+
+**메시지 기능**
+
+`reason` 을 `MessageSource` 에서 찾는 기능도 제공한다. `reason = "error.bad"`
+
+```java
+
+@ResponseStatus(code = HttpStatus.BAD_REQUEST, reason = "error.bad")
+public class BadRequestException extends RuntimeException {}
+```
+
+**messages.properties**
+
+```properties
+error.bad=잘못된 요청 오류입니다. 메시지 사용
+```
+
+2) `ResponseStatusException` 예외
+
+`@ResponseStatus` 는 개발자가 직접 변경할 수 없는 예외에는 적용할 수 없다.
+
+(애노테이션을 직접 넣어야 하는데, 내가 코드를 수정할 수 없는 라이브러리의 예외 코드 같은 곳에는 적용할 수 없다.)
+
+추가로 애노테이션을 사용하기 때문에 조건에 따라 동적으로 변경하는 것도 어렵다. 이때는 `ResponseStatusException` 예외를 사용하면 된다.
+
+```java
+
+@GetMapping("/api/response-status-ex2")
+public String responseStatusEx2() {
+    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "error.bad", new IllegalArgumentException());
+}
+```
+
+### DefaultHandlerExceptionResolver
+
+대표적으로 파라미터 바인딩 시점에 타입이 맞지 않으면 내부에서 `TypeMismatchException` 이 발생하는데,
+
+이 경우 예외가 발생했기 때문에 그냥 두면 서블릿 컨테이너까지 오류가 올라가고, 결과적으로 500 오류가 발생한다.
+
+그런데 파라미터 바인딩은 대부분 클라이언트가 HTTP 요청 정보를 잘못 호출해서 발생하는 문제이다.
+
+HTTP 에서는 이런 경우 HTTP 상태 코드 400을 사용하도록 되어 있다.
+
+`DefaultHandlerExceptionResolver` 는 이것을 500 오류가 아니라 HTTP 상태 코드 400 오류로 변경한다.
+
+스프링 내부 오류를 어떻게 처리할지 수 많은 내용이 정의되어 있다.
+
+```json
+
+{
+  "status": 400,
+  "error": "Bad Request",
+  "exception": "org.springframework.web.method.annotation.MethodArgumentTypeMismatchException",
+  "message": "Failed to convert value of type 'java.lang.String' to required type 'java.lang.Integer'; nested exception is java.lang.NumberFormatException: For input string: \"hello\"",
+  "path": "/api/default-handler-ex"
+}
+```
 
 
 
