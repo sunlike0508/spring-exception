@@ -5,6 +5,7 @@ import java.util.List;
 import hello.exception.filter.LogFilter;
 import hello.exception.interceptor.LoginInterceptor;
 import hello.exception.resolver.MyHandlerExceptionHandler;
+import hello.exception.resolver.UserHandlerExceptionResolver;
 import jakarta.servlet.DispatcherType;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +26,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void extendHandlerExceptionResolvers(List<HandlerExceptionResolver> resolvers) {
         resolvers.add(new MyHandlerExceptionHandler());
+        resolvers.add(new UserHandlerExceptionResolver());
     }
 
 
