@@ -296,3 +296,4 @@ server.error.include-binding-errors=on_param
 `message=&errors=&trace=` 를 url에 넣고 돌려보자.
 
 에러 공통 처리 컨트롤러의 기능을 변경하고 싶으면 `ErrorController` 인터페이스를 상속 받아서 구현하거나 `BasicErrorController` 상속 받아서 기능을 추가하면 된다.
+
