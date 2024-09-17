@@ -336,7 +336,10 @@ view를 제공한다.
 ## HandlerExceptionResolver
 
 
+<img width="929" alt="Screenshot 2024-09-17 at 15 06 01" src="https://github.com/user-attachments/assets/17fa4c4a-71e4-4c1f-93ed-eaf87c5b2840">
 
+
+<img width="929" alt="Screenshot 2024-09-17 at 15 05 56" src="https://github.com/user-attachments/assets/6dfb3ad7-2af4-460f-9dd6-bf747ae0e2dc">
 
 
 
