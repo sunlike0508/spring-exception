@@ -18,6 +18,11 @@ public class ApiExceptionController {
 
         }
 
+        if(id.equals("bad")) {
+
+            throw new IllegalArgumentException("뭐야 이게 ?");
+        }
+
         return new MemberDto(id, "hello " + id);
     }
 

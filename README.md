@@ -297,3 +297,64 @@ server.error.include-binding-errors=on_param
 
 에러 공통 처리 컨트롤러의 기능을 변경하고 싶으면 `ErrorController` 인터페이스를 상속 받아서 구현하거나 `BasicErrorController` 상속 받아서 기능을 추가하면 된다.
 
+# API 예외 처리
+
+BasicErrorController 에서 기본 제공
+
+```java
+
+@RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
+public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
+    HttpStatus status = getStatus(request);
+    Map<String, Object> model = Collections.unmodifiableMap(
+            getErrorAttributes(request, getErrorAttributeOptions(request, MediaType.TEXT_HTML)));
+    response.setStatus(status.value());
+    ModelAndView modelAndView = resolveErrorView(request, response, status, model);
+    return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
+}
+
+
+@RequestMapping
+public ResponseEntity<Map<String, Object>> error(HttpServletRequest request) {
+    HttpStatus status = getStatus(request);
+    if(status == HttpStatus.NO_CONTENT) {
+        return new ResponseEntity<>(status);
+    }
+    Map<String, Object> body = getErrorAttributes(request, getErrorAttributeOptions(request, MediaType.ALL));
+    return new ResponseEntity<>(body, status);
+}
+
+```
+
+`/error` 동일한 경로를 처리하는 `errorHtml()` , `error()` 두 메서드를 확인할 수 있다.
+
+`errorHtml()` : `produces = MediaType.TEXT_HTML_VALUE` : 클라이언트 요청의 Accept 해더 값이 `text/html` 인 경우에는 `errorHtml()` 을 호출해서
+view를 제공한다.
+
+`error()` : 그외 경우에 호출되고 `ResponseEntity` 로 HTTP Body에 JSON 데이터를 반환한다.
+
+## HandlerExceptionResolver
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
