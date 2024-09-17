@@ -14,7 +14,7 @@ public class MyHandlerExceptionHandler implements HandlerExceptionResolver {
     public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response, Object handler,
             Exception ex) {
 
-        log.info("call myResolver = {}", ex);
+        log.info("call myResolver", ex);
 
         try {
             if(ex instanceof IllegalArgumentException) {
